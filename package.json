@@ -1,0 +1,48 @@
+{
+  "name": "xrayc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A simple, transparent Xray desktop client",
+  "author": "Xrayc contributors",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:ui": "vite",
+    "build": "npm run typecheck && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "cargo test --manifest-path native/Cargo.toml --locked",
+    "test:ui": "playwright test",
+    "test:cores": "node scripts/check-cores.mjs",
+    "prepare:cores": "node scripts/prepare-cores.mjs",
+    "build:service": "node scripts/build-service.mjs",
+    "package": "npm run build && npm run build:service && electron-builder --dir",
+    "install:local": "node scripts/install-local.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^25.0.0",
+    "electron": "^45.3.1",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.0",
+    "vite": "^8.3.8"
+  },
+  "overrides": {
+    "minimatch@>=7 <11.0.1": "^11.0.8"
+  },
+  "build": {
+    "appId": "io.xrayc.desktop",
+    "productName": "Xrayc",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "assets/icon.png", "package.json", "LICENSE"],
+    "extraResources": [
+      { "from": "resources/bin", "to": "bin" },
+      { "from": "THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
+    ],
+    "linux": { "target": ["dir"], "category": "Network", "icon": "assets/icon.png" },
+    "mac": { "target": ["dir"], "category": "public.app-category.utilities" },
+    "win": { "target": ["dir"], "requestedExecutionLevel": "asInvoker" }
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+resources/bin/
+native/target/
+playwright-report/
+test-results/
+*.log
+.DS_Store

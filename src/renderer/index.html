@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'" />
+    <meta name="color-scheme" content="dark" />
+    <title>Xrayc</title>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Xrayc</h1>
+      <div class="editor-heading">
+        <label for="configuration">Xray configuration</label>
+        <button id="paste" type="button" class="paste-button">Paste</button>
+      </div>
+      <textarea id="configuration" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Xray JSON configuration" aria-describedby="validation" placeholder="Paste your Xray JSON configuration here…"></textarea>
+      <div id="validation" class="validation" role="status" aria-live="polite">
+        <span id="validation-text">Paste a configuration to begin.</span>
+        <span id="protocols"></span><span id="permission-note"></span>
+      </div>
+      <label class="remember-label" id="remember-label" title="Saved configurations are encrypted using your system’s secure storage.">
+        <input type="checkbox" id="remember" /> Remember config
+      </label>
+      <p class="message error" id="save-message" role="status" aria-live="polite"></p>
+      <button id="connect" type="button" class="connect-button" disabled aria-label="Connect Xray"><span id="connect-label">Connect</span></button>
+      <div class="status" role="status" aria-live="polite"><span id="status-dot" class="status-dot"></span><span id="status-label">Disconnected</span><span id="duration"></span></div>
+      <p id="connection-message" class="message" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
