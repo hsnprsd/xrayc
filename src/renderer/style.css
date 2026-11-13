@@ -56,10 +56,9 @@ textarea::placeholder { color: #788496; }
 .connect-button:disabled { background: #293a32; color: #87968e; }
 .connect-button.connected { background: #29353b; color: #e0e7ec; }
 .status { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 16px; }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #788496; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #f2a5a0; }
 .status-dot.connected { background: var(--accent); }
 .status-dot.connecting, .status-dot.disconnecting { background: #e4c18c; }
-.status-dot.error { background: #f2a5a0; }
 #duration { font-variant-numeric: tabular-nums; }
 .message { font-size: 11px; color: var(--muted); line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; text-align: center; margin: 0; }
 .message:not(:empty) { margin-top: 10px; }

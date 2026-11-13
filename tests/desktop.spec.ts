@@ -7,21 +7,53 @@ import path from 'node:path';
 let app: ElectronApplication;
 let page: Page;
 let profile: string;
+let closed: boolean;
 const inbounds = [{ protocol: 'socks', listen: '127.0.0.1', port: 1080, settings: { udp: true } }];
 const config = JSON.stringify({ inbounds, outbounds: [{ protocol: 'vless', settings: { vnext: [{ address: 'vpn.example', port: 443, users: [{ id: '00000000-0000-4000-8000-000000000001', encryption: 'none' }] }] } }] }, null, 2);
 
+async function observeTray() {
+  const root = await app.evaluate(({ app }) => app.getAppPath());
+  const paths = [
+    ['green', 'icon.png'], ['yellow', 'icon-connecting.png'], ['red', 'icon-disconnected.png'],
+  ].map(([color, filename]) => ({ color, filename: path.join(root, 'assets', filename) }));
+  await app.evaluate(({ Tray, nativeImage }, paths) => {
+    const icons = paths.map(({ color, filename }) => ({ color, image: nativeImage.createFromPath(filename).resize({ width: 24, height: 24 }).toDataURL() }));
+    const observed: { colors: string[]; tray: Electron.Tray | null; menu: Electron.Menu | null } = { colors: [], tray: null, menu: null };
+    (globalThis as any).trayTest = observed;
+    const setImage = Tray.prototype.setImage;
+    Tray.prototype.setImage = function (image) {
+      const data = (typeof image === 'string' ? nativeImage.createFromPath(image) : image).toDataURL();
+      const color = icons.find((icon) => icon.image === data)?.color ?? 'unknown';
+      if (observed.colors.at(-1) !== color) observed.colors.push(color);
+      observed.tray = this;
+      return setImage.call(this, image);
+    };
+    const setContextMenu = Tray.prototype.setContextMenu;
+    Tray.prototype.setContextMenu = function (menu) {
+      observed.menu = menu;
+      return setContextMenu.call(this, menu);
+    };
+  }, paths);
+}
+
+async function trayColors() {
+  return app.evaluate(() => (globalThis as any).trayTest.colors);
+}
+
 test.beforeEach(async () => {
+  closed = false;
   profile = await mkdtemp(path.join(tmpdir(), 'xrayc-desktop-test-'));
   const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.XRAYC_DEV_URL;
   const executablePath = process.env.XRAYC_TEST_BINARY;
   app = await electron.launch({ executablePath, args: [...(executablePath ? [] : ['.']), `--user-data-dir=${profile}`], env });
+  app.on('close', () => { closed = true; });
   page = await app.firstWindow();
   await expect(page.locator('#configuration')).toBeVisible();
 });
 test.afterEach(async () => {
-  await app?.close();
+  if (app && !closed) await app.close();
   if (profile) await rm(profile, { recursive: true, force: true });
 });
 
@@ -84,7 +116,9 @@ test('connects and disconnects with accessible status and locked configuration',
   await expect(page.locator('#configuration')).toBeEnabled();
 });
 
-test('runs a real user-configured SOCKS inbound without administrator access', async () => {
+test('keeps a real SOCKS connection in the tray, changes icon colors and quits cleanly', async () => {
+  await observeTray();
+  await expect(page.locator('#status-dot')).toHaveCSS('background-color', 'rgb(242, 165, 160)');
   const reservation = createServer();
   await new Promise<void>((resolve) => reservation.listen(0, '127.0.0.1', resolve));
   const port = (reservation.address() as { port: number }).port;
@@ -96,6 +130,14 @@ test('runs a real user-configured SOCKS inbound without administrator access', a
   await expect(page.locator('#validation')).toHaveClass('validation valid');
   await page.getByRole('button', { name: 'Connect Xray', exact: true }).click();
   await expect(page.locator('#status-label')).toHaveText('Connected');
+  await expect(page.locator('#status-dot')).toHaveCSS('background-color', 'rgb(168, 231, 193)');
+  expect(await trayColors()).toEqual(['yellow', 'green']);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+  expect(await app.evaluate(({ BrowserWindow }) => ({
+    visible: BrowserWindow.getAllWindows()[0].isVisible(),
+    destroyed: BrowserWindow.getAllWindows()[0].isDestroyed(),
+    trayAlive: !(globalThis as any).trayTest.tray.isDestroyed(),
+  }))).toEqual({ visible: false, destroyed: false, trayAlive: true });
   const reply = await new Promise<Buffer>((resolve, reject) => {
     const socket = createConnection({ host: '127.0.0.1', port }, () => socket.write(Buffer.from([5, 1, 0])));
     socket.setTimeout(5000, () => { socket.destroy(); reject(new Error('SOCKS handshake timed out')); });
@@ -103,8 +145,56 @@ test('runs a real user-configured SOCKS inbound without administrator access', a
     socket.once('error', reject);
   });
   expect([...reply]).toEqual([5, 0]);
+  await app.evaluate(() => {
+    (globalThis as any).trayTest.menu.items.find((item: any) => item.label === 'Show Xrayc').click();
+  });
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
+  await expect(page.locator('#configuration')).toBeDisabled();
+  await expect(page.locator('#status-label')).toHaveText('Connected');
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].close();
+    (globalThis as any).trayTest.tray.emit('click');
+  });
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())).toBe(true);
   await page.getByRole('button', { name: 'Disconnect Xray', exact: true }).click();
   await expect(page.locator('#status-label')).toHaveText('Disconnected');
+  await expect(page.locator('#status-dot')).toHaveCSS('background-color', 'rgb(242, 165, 160)');
+  expect(await trayColors()).toEqual(['yellow', 'green', 'yellow', 'red']);
+
+  await page.getByRole('button', { name: 'Connect Xray', exact: true }).click();
+  await expect(page.locator('#status-label')).toHaveText('Connected');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+  const child = app.process();
+  const exited = app.waitForEvent('close');
+  await app.evaluate(() => {
+    (globalThis as any).trayTest.menu.items.find((item: any) => item.label === 'Quit Xrayc').click();
+  });
+  await exited;
+  await expect.poll(() => child.exitCode).toBe(0);
+  // A released port proves that quitting also stopped the active Xray listener.
+  const listener = createServer();
+  await new Promise<void>((resolve, reject) => { listener.once('error', reject); listener.listen(port, '127.0.0.1', resolve); });
+  await new Promise<void>((resolve) => listener.close(() => resolve()));
+});
+
+test('uses a red tray icon after connection failure', async () => {
+  await observeTray();
+  const listener = createServer();
+  await new Promise<void>((resolve) => listener.listen(0, '127.0.0.1', resolve));
+  try {
+    const port = (listener.address() as { port: number }).port;
+    await page.locator('#configuration').fill(JSON.stringify({
+      inbounds: [{ protocol: 'socks', listen: '127.0.0.1', port }],
+      outbounds: [{ protocol: 'freedom' }],
+    }));
+    await expect(page.locator('#validation')).toHaveClass('validation valid');
+    await page.getByRole('button', { name: 'Connect Xray', exact: true }).click();
+    await expect(page.locator('#status-label')).toHaveText('Connection failed');
+    await expect(page.locator('#status-dot')).toHaveCSS('background-color', 'rgb(242, 165, 160)');
+    expect(await trayColors()).toEqual(['yellow', 'red']);
+  } finally {
+    await new Promise<void>((resolve) => listener.close(() => resolve()));
+  }
 });
 
 test('has a sandboxed renderer and a readable desktop layout', async () => {

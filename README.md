@@ -20,7 +20,9 @@ Xray-core **26.11.9** is bundled with the application, together with its GeoIP/G
 1. Open **Xrayc** from the application menu, or run `xrayc`.
 2. Paste a complete Xray client JSON configuration. Comments and trailing commas are accepted. Subscription URLs and `vless://` / `vmess://` links are not configuration files.
 3. Press **Connect**. A configuration with TUN or privileged networking settings will request administrator approval. A normal SOCKS/HTTP listener on a high port runs without elevation.
-4. Press **Disconnect** to stop Xray. Closing the application also disconnects.
+4. Press **Disconnect** to stop Xray. Closing the window hides it in the **system tray** and keeps the connection running. Click the tray icon or choose **Show Xrayc** to reopen the window. Choose **Quit Xrayc** from the tray menu to disconnect and exit.
+
+The tray and window icons are **green** when connected, **yellow** while connecting or disconnecting, and **red** when disconnected or after an error. Your desktop must support system tray icons (GNOME may need an AppIndicator extension).
 
 The small line below the editor shows validation errors and whether authorization is required. Preliminary validation checks the JSON structure; Xray itself checks the configuration before starting any inbounds. **Connected** means Xray has started, not that a remote server’s credentials/reachability have been independently verified. There are no analytics or external connectivity probes.
 
@@ -54,7 +56,7 @@ See the pinned upstream [native TUN documentation](https://github.com/XTLS/Xray-
 - The Electron renderer is sandboxed, context isolated, and has no Node.js integration. Only a small preload API is exposed.
 - Only configurations detected as needing privileged networking are elevated: native TUN, Unix low ports, transparent proxy settings, or outbound packet marks. Other unusual OS-specific permission requirements may still cause an explicit Xray startup error.
 - Linux authorization uses `pkexec`, falling back to `sudo -A` only if `pkexec` is unavailable. macOS uses its administrator dialog; Windows uses UAC.
-- The network service and Xray session communicate over an authenticated, heartbeat-monitored loopback connection. Closing it stops Xray. Linux parent-death signals also stop Xray if the session process is killed.
+- The network service and Xray session communicate over an authenticated, heartbeat-monitored loopback connection. Quitting the application closes it and stops Xray. Linux parent-death signals also stop Xray if the session process is killed.
 - **The only runtime configuration change is logging:** imported log-file paths are replaced with console diagnostics at info level, with access logging disabled. This avoids privileged writes to arbitrary imported paths and allows reliable startup detection. All networking fields, including API inbounds and routing, remain unchanged. Diagnostics are not written to a persistent application log.
 - Import only configurations you trust. Inbounds may expose ports beyond localhost if the supplied configuration requests it. Relative certificate paths resolve from the bundled binary directory; use absolute paths when appropriate.
 - This is **not an app-enforced kill switch** or an independently audited leak-prevention product. Routing, DNS protection and bypass behavior depend on your configuration and Xray’s platform support.

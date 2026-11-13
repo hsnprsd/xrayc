@@ -36,7 +36,7 @@
     "appId": "io.xrayc.desktop",
     "productName": "Xrayc",
     "directories": { "output": "release" },
-    "files": ["dist/**/*", "assets/icon.png", "package.json", "LICENSE"],
+    "files": ["dist/**/*", "assets/*.png", "package.json", "LICENSE"],
     "extraResources": [
       { "from": "resources/bin", "to": "bin" },
       { "from": "THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
