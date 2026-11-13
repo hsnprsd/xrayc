@@ -47,10 +47,11 @@ test('requires configured inbounds and permits explicit direct outbounds', async
   await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeEnabled();
 });
 
-test('shows opt-in native TUN and its authorization requirement', async () => {
+test('accepts native TUN configurations with an empty validation message', async () => {
   await page.locator('#configuration').fill(JSON.stringify({ inbounds: [{ protocol: 'tun', settings: { name: 'user-tun' } }], outbounds: [{ protocol: 'freedom' }] }));
   await expect(page.locator('#validation')).toHaveClass('validation valid');
-  await expect(page.locator('#validation')).toHaveText('Admin permission required');
+  await expect(page.locator('#validation')).toHaveText('');
+  await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeEnabled();
 });
 
 test('connects and disconnects with accessible status and locked configuration', async () => {

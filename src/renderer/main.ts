@@ -48,7 +48,6 @@ async function validate() {
   const empty = !configuration.value.trim();
   element('validation-text').textContent = empty ? 'Paste a configuration to begin.' : 'Checking…';
   element('validation').className = 'validation';
-  element('permission-note').textContent = '';
   if (!api || empty) return;
   try {
     const result = await api.validate(configuration.value);
@@ -56,9 +55,6 @@ async function validate() {
     validation = result;
     element('validation-text').textContent = result.valid ? '' : result.message;
     element('validation').className = `validation ${result.valid ? 'valid' : 'invalid'}`;
-    if (result.valid) {
-      element('permission-note').textContent = result.requiresElevation ? 'Admin permission required' : '';
-    }
   } catch (error) {
     if (revision !== editRevision) return;
     element('validation-text').textContent = error instanceof Error ? error.message : 'Unable to check configuration.';
