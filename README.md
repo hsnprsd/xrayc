@@ -22,7 +22,7 @@ Xray-core **26.11.9** is bundled with the application, together with its GeoIP/G
 3. Press **Connect**. A configuration with TUN or privileged networking settings will request administrator approval. A normal SOCKS/HTTP listener on a high port runs without elevation.
 4. Press **Disconnect** to stop Xray. Closing the application also disconnects.
 
-The small line below the editor shows the configured inbound/outbound protocols and whether authorization is required. Preliminary validation checks the JSON structure; Xray itself checks the configuration before starting any inbounds. **Connected** means Xray has started, not that a remote server’s credentials/reachability have been independently verified. There are no analytics or external connectivity probes.
+The small line below the editor shows validation errors and whether authorization is required. Preliminary validation checks the JSON structure; Xray itself checks the configuration before starting any inbounds. **Connected** means Xray has started, not that a remote server’s credentials/reachability have been independently verified. There are no analytics or external connectivity probes.
 
 **Remember config** is off by default. Saved configurations use Electron’s OS-backed `safeStorage`. Saving is disabled when secure storage is unavailable, including Linux’s insecure `basic_text` backend; unlock/configure your desktop keyring to enable it. Runtime configurations briefly exist in private temporary directories so Xray can read them. Normal shutdown removes them; a hard service/system crash may leave a private temporary directory behind.
 

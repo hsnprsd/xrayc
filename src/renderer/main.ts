@@ -6,7 +6,6 @@ const api = window.xrayc;
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const configuration = element<HTMLTextAreaElement>('configuration');
 const connect = element<HTMLButtonElement>('connect');
-const paste = element<HTMLButtonElement>('paste');
 const remember = element<HTMLInputElement>('remember');
 const saveMessage = element<HTMLParagraphElement>('save-message');
 let status: Status = { phase: 'disconnected', message: 'Xray is stopped.' };
@@ -33,7 +32,6 @@ function renderStatus() {
   connect.setAttribute('aria-label', `${action} Xray`);
   connect.disabled = !api || busy || status.phase === 'disconnecting' || (!active && !validation.valid);
   configuration.disabled = active || busy;
-  paste.disabled = active || busy || !api;
   renderDuration();
 }
 function renderDuration() {
@@ -50,7 +48,6 @@ async function validate() {
   const empty = !configuration.value.trim();
   element('validation-text').textContent = empty ? 'Paste a configuration to begin.' : 'Checking…';
   element('validation').className = 'validation';
-  element('protocols').textContent = '';
   element('permission-note').textContent = '';
   if (!api || empty) return;
   try {
@@ -60,7 +57,6 @@ async function validate() {
     element('validation-text').textContent = result.valid ? '' : result.message;
     element('validation').className = `validation ${result.valid ? 'valid' : 'invalid'}`;
     if (result.valid) {
-      element('protocols').textContent = `${result.inbounds.join(' + ')} → ${result.protocols.join(' + ')}`;
       element('permission-note').textContent = result.requiresElevation ? 'Admin permission required' : '';
     }
   } catch (error) {
@@ -94,10 +90,6 @@ function edited() {
 configuration.addEventListener('input', edited);
 configuration.addEventListener('blur', () => { clearTimeout(saveTimer); void save(); });
 remember.addEventListener('change', () => { clearTimeout(saveTimer); void save(); });
-paste.addEventListener('click', async () => {
-  try { configuration.value = await navigator.clipboard.readText(); edited(); configuration.focus(); }
-  catch { saveMessage.textContent = 'Use Ctrl+V (⌘V on Mac) to paste into the editor.'; configuration.focus(); }
-});
 connect.addEventListener('click', async () => {
   if (!api || busy) return;
   busy = true;

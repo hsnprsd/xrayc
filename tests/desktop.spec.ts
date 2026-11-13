@@ -25,11 +25,11 @@ test.afterEach(async () => {
   if (profile) await rm(profile, { recursive: true, force: true });
 });
 
-test('validates pasted JSON and shows the actual inbound and outbound', async () => {
+test('validates pasted JSON and enables connection without a protocol summary', async () => {
   await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeDisabled();
   await page.getByRole('textbox', { name: 'Xray JSON configuration' }).fill(config);
   await expect(page.locator('#validation')).toHaveClass('validation valid');
-  await expect(page.locator('#protocols')).toHaveText('socks → vless');
+  await expect(page.locator('#validation')).toHaveText('');
   await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeEnabled();
   await page.locator('#configuration').fill('');
   await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeDisabled();
@@ -43,14 +43,14 @@ test('requires configured inbounds and permits explicit direct outbounds', async
   await expect(page.locator('#validation-text')).toContainText('“inbounds” array');
   await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeDisabled();
   await page.locator('#configuration').fill(JSON.stringify({ inbounds, outbounds: [{ protocol: 'freedom' }] }));
-  await expect(page.locator('#protocols')).toHaveText('socks → freedom');
+  await expect(page.locator('#validation')).toHaveClass('validation valid');
   await expect(page.getByRole('button', { name: 'Connect Xray', exact: true })).toBeEnabled();
 });
 
 test('shows opt-in native TUN and its authorization requirement', async () => {
   await page.locator('#configuration').fill(JSON.stringify({ inbounds: [{ protocol: 'tun', settings: { name: 'user-tun' } }], outbounds: [{ protocol: 'freedom' }] }));
-  await expect(page.locator('#protocols')).toHaveText('tun → freedom');
-  await expect(page.locator('#permission-note')).toContainText('Admin permission required');
+  await expect(page.locator('#validation')).toHaveClass('validation valid');
+  await expect(page.locator('#validation')).toHaveText('Admin permission required');
 });
 
 test('connects and disconnects with accessible status and locked configuration', async () => {
@@ -93,7 +93,6 @@ test('runs a real user-configured SOCKS inbound without administrator access', a
     outbounds: [{ protocol: 'freedom' }],
   }));
   await expect(page.locator('#validation')).toHaveClass('validation valid');
-  await expect(page.locator('#protocols')).toHaveText('socks → freedom');
   await page.getByRole('button', { name: 'Connect Xray', exact: true }).click();
   await expect(page.locator('#status-label')).toHaveText('Connected');
   const reply = await new Promise<Buffer>((resolve, reject) => {
