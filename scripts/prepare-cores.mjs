@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, writeFile, mkdir, rm, readdir, copyFile, chmod } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir, rm, readdir, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -31,12 +31,11 @@ try {
     } else execFileSync('tar', ['-xzf', archive, '-C', extracted]);
     for (const file of await readdir(extracted, { recursive: true })) {
       const base = path.basename(file);
-      if ([name, `${name}.exe`, 'geoip.dat', 'geosite.dat', 'wintun.dll'].includes(base)) {
+      if (['geoip.dat', 'geosite.dat', 'wintun.dll'].includes(base)) {
         await copyFile(path.join(extracted, file), path.join(output, base));
-        if (process.platform !== 'win32' && base === name) await chmod(path.join(output, base), 0o755);
       }
       if (/^(licen[cs]e|copying)/i.test(base)) await copyFile(path.join(extracted, file), path.join(output, `${name}-${base}`));
     }
-    console.log(`Verified and installed ${name}.`);
+    console.log(`Verified and installed ${name} assets and licenses (no executable).`);
   }
 } finally { await rm(temp, { recursive: true, force: true }); }

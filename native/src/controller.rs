@@ -105,10 +105,14 @@ impl Controller {
         }
     }
     fn session(&self, config: Value, stop: &Receiver<()>) -> Result<(), String> {
-        for name in ["xray", "xrayc-service"] {
-            if !binary(&self.dir, name).is_file() {
+        for path in [
+            binary(&self.dir, "xrayc-service"),
+            crate::core::library_path(&self.dir),
+        ] {
+            if !path.is_file() {
                 return Err(format!(
-                    "Missing {name}. Reinstall Xrayc or build its networking components."
+                    "Missing {}. Reinstall Xrayc or build its networking components.",
+                    path.display()
                 ));
             }
         }
@@ -192,7 +196,6 @@ impl Controller {
         let mut connected = false;
         let deadline = Instant::now() + Duration::from_secs(45);
         let mut last_ping = Instant::now();
-        let mut last_log = String::new();
         let result = loop {
             if stop.try_recv().is_ok() {
                 break Ok(());
@@ -215,23 +218,11 @@ impl Controller {
                             "Xray is running. Inbounds and routing follow your configuration.",
                         );
                     }
-                    Some("log") => {
-                        last_log = value["message"]
-                            .as_str()
-                            .unwrap_or("")
-                            .chars()
-                            .take(1000)
-                            .collect();
-                    }
                     Some("error") => {
-                        let mut error = value["message"]
+                        break Err(value["message"]
                             .as_str()
                             .unwrap_or("Xray startup failed.")
-                            .to_owned();
-                        if !last_log.is_empty() {
-                            error.push_str(&format!("\n{last_log}"));
-                        }
-                        break Err(error);
+                            .to_owned());
                     }
                     Some("closed") => {
                         break Err(

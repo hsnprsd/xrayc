@@ -12,10 +12,12 @@
     "dev:ui": "vite",
     "build": "npm run typecheck && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "cargo test --manifest-path native/Cargo.toml --locked",
+    "test": "npm run test:core && cargo test --manifest-path native/Cargo.toml --locked",
+    "test:core": "go -C native/xray test -mod=readonly -race ./...",
     "test:ui": "playwright test",
     "test:cores": "node scripts/check-cores.mjs",
     "prepare:cores": "node scripts/prepare-cores.mjs",
+    "build:core": "node scripts/build-core.mjs",
     "build:service": "node scripts/build-service.mjs",
     "package": "npm run build && npm run build:service && electron-builder --dir",
     "install:local": "node scripts/install-local.mjs"

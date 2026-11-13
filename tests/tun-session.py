@@ -115,7 +115,7 @@ def accept_clients():
 threading.Thread(target=accept_clients, daemon=True).start()
 
 
-def run_session(crash=False, cancel=False, service_crash=False):
+def run_session(crash=False, cancel=False, service_crash=False, startup_error=False, heartbeat_timeout=False):
     controller = socket.socket()
     controller.bind(("127.0.0.1", 0))
     controller.listen()
@@ -134,6 +134,8 @@ def run_session(crash=False, cancel=False, service_crash=False):
         hello = json.loads(hello_line)
         assert hello["type"] == "hello" and hello["token"] == "a" * 64, hello
         xray = json.loads((configs / "xray.json").read_text())
+        if startup_error:
+            xray["inbounds"].append({"protocol": "socks", "listen": "127.0.0.1", "port": 19080})
         messages.write((json.dumps({"type": "start", "config": xray}) + "\n").encode())
         if cancel:
             messages.write(b'{"type":"stop"}\n')
@@ -142,12 +144,22 @@ def run_session(crash=False, cancel=False, service_crash=False):
             event = json.loads(messages.readline())
             startup.append(event)
             if event["type"] == "error":
-                raise AssertionError(startup)
-            if event["type"] == ("stopped" if cancel else "ready"):
+                assert startup_error and "address already in use" in event["message"], startup
                 break
-        if not cancel:
+            if event["type"] == ("stopped" if cancel else "ready"):
+                assert not startup_error, "A conflicting listener must fail startup"
+                break
+        if not cancel and not startup_error:
             assert "xrayc0" in subprocess.check_output(["ip", "link", "show"], text=True)
-        if not crash and not cancel and not service_crash:
+            maps = Path(f"/proc/{process.pid}/maps").read_text()
+            assert str(binaries / "libxrayc-core.so") in maps, "Xray must run inside the network service"
+            children = [child for task in Path(f"/proc/{process.pid}/task").iterdir()
+                        for child in (task / "children").read_text().split()]
+            assert children == [], f"The embedded session must not spawn a core process: {children}"
+        if heartbeat_timeout:
+            event = json.loads(messages.readline())
+            assert event["type"] == "stopped", event
+        if not any([crash, cancel, service_crash, startup_error, heartbeat_timeout]):
             for family, target in [(socket.AF_INET, "198.18.0.10"), (socket.AF_INET6, "2001:db8::10")]:
                 with socket.socket(family, socket.SOCK_STREAM) as request:
                     request.settimeout(10)
@@ -175,11 +187,11 @@ def run_session(crash=False, cancel=False, service_crash=False):
                     break
         if service_crash:
             process.kill()
-        # An abrupt control-channel loss must also restore routing and reap cores.
+        # An abrupt control-channel loss must also close the core and restore routing.
         messages.close()
         channel.close()
         channel = None
-        assert process.wait(timeout=15) == (-9 if service_crash else 0), process.stderr.read().decode()
+        assert process.wait(timeout=15) == (-9 if service_crash else 1 if startup_error else 0), process.stderr.read().decode()
         deadline = time.monotonic() + 10
         while "xrayc0" in subprocess.check_output(["ip", "link", "show"], text=True) and time.monotonic() < deadline:
             time.sleep(0.1)
@@ -206,7 +218,11 @@ print("PASS: controller crash restores routes and removes the TUN interface")
 run_session(cancel=True)
 print("PASS: cancellation during startup leaves the network unchanged")
 run_session(service_crash=True)
-print("PASS: network service crash terminates Xray and restores routing")
+print("PASS: network service crash removes the embedded TUN interface and restores routing")
+run_session(startup_error=True)
+print("PASS: partial startup failure closes the embedded core and restores routing")
+run_session(heartbeat_timeout=True)
+print("PASS: heartbeat timeout closes the embedded core and restores routing")
 
 # Exercise the non-elevated connection manager too. This namespace already has
 # its own administrator capabilities; replace only the authorization prompt.

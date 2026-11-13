@@ -1,6 +1,8 @@
 # Xrayc
 
-A simple **Electron + TypeScript** desktop client for **Xray-core**, with a small **Rust network service**.
+A simple **Electron + TypeScript** desktop client with **Xray-core embedded in a small Rust network service** through a Go shared library. There is no standalone Xray executable or Xray child process.
+
+The app is being migrated incrementally to **one Flutter application for Linux, Windows and Android**. This first step changes the core integration while retaining the working desktop UI. Flutter and Android support are not implemented yet.
 
 Paste a configuration, press **Connect**, and press **Disconnect** when you’re done. The interface is just a configuration editor, optional encrypted storage, one connection button, and status.
 
@@ -13,7 +15,7 @@ Paste a configuration, press **Connect**, and press **Disconnect** when you’re
 - Mixed inbounds and direct outbounds are allowed.
 - There is **no sing-box or TUN-to-SOCKS bridge**.
 
-Xray-core **26.11.9** is bundled with the application, together with its GeoIP/GeoSite assets and platform-specific Wintun DLL where supplied by the Windows release. There are no runtime binary downloads.
+Xray-core **26.11.9** is built from pinned, Go-checksum-verified source and bundled as `libxrayc-core.so`, `xrayc-core.dll`, or `libxrayc-core.dylib`. GeoIP/GeoSite assets and the platform-specific Wintun DLL, where supplied by the Windows release, are bundled alongside it. There are no runtime downloads.
 
 ## Use it
 
@@ -26,7 +28,7 @@ The tray and window icons are **green** when connected, **yellow** while connect
 
 The small line below the editor shows validation errors and whether authorization is required. Preliminary validation checks the JSON structure; Xray itself checks the configuration before starting any inbounds. **Connected** means Xray has started, not that a remote server’s credentials/reachability have been independently verified. There are no analytics or external connectivity probes.
 
-**Remember config** is off by default. Saved configurations use Electron’s OS-backed `safeStorage`. Saving is disabled when secure storage is unavailable, including Linux’s insecure `basic_text` backend; unlock/configure your desktop keyring to enable it. Runtime configurations briefly exist in private temporary directories so Xray can read them. Normal shutdown removes them; a hard service/system crash may leave a private temporary directory behind.
+**Remember config** is off by default. Saved configurations use Electron’s OS-backed `safeStorage`. Saving is disabled when secure storage is unavailable, including Linux’s insecure `basic_text` backend; unlock/configure your desktop keyring to enable it. Runtime configurations are passed to the embedded core in memory, not written to plaintext temporary files. Private temporary directories hold only the controller's connection descriptor; a hard service/system crash may leave one behind.
 
 ### Native TUN configuration
 
@@ -56,25 +58,25 @@ See the pinned upstream [native TUN documentation](https://github.com/XTLS/Xray-
 - The Electron renderer is sandboxed, context isolated, and has no Node.js integration. Only a small preload API is exposed.
 - Only configurations detected as needing privileged networking are elevated: native TUN, Unix low ports, transparent proxy settings, or outbound packet marks. Other unusual OS-specific permission requirements may still cause an explicit Xray startup error.
 - Linux authorization uses `pkexec`, falling back to `sudo -A` only if `pkexec` is unavailable. macOS uses its administrator dialog; Windows uses UAC.
-- The network service and Xray session communicate over an authenticated, heartbeat-monitored loopback connection. Quitting the application closes it and stops Xray. Linux parent-death signals also stop Xray if the session process is killed.
-- **The only runtime configuration change is logging:** imported log-file paths are replaced with console diagnostics at info level, with access logging disabled. This avoids privileged writes to arbitrary imported paths and allows reliable startup detection. All networking fields, including API inbounds and routing, remain unchanged. Diagnostics are not written to a persistent application log.
+- The controller and network session communicate over an authenticated, heartbeat-monitored loopback connection. The session loads Xray-core into its own process; it does not spawn Xray. Quitting the application closes the connection and calls the core's shutdown API. Loss of heartbeats also closes the session.
+- **The only runtime configuration change is logging:** imported log-file paths are replaced with console diagnostics at info level, with access logging disabled. This avoids privileged writes to arbitrary imported paths. Startup is determined by the core API returning successfully, not by matching log messages. All networking fields, including API inbounds and routing, remain unchanged. Diagnostics are not written to a persistent application log.
 - Import only configurations you trust. Inbounds may expose ports beyond localhost if the supplied configuration requests it. Relative certificate paths resolve from the bundled binary directory; use absolute paths when appropriate.
 - This is **not an app-enforced kill switch** or an independently audited leak-prevention product. Routing, DNS protection and bypass behavior depend on your configuration and Xray’s platform support.
-- **Linux x64 is built and tested locally.** Windows/macOS paths and x64/arm64 downloads are implemented but still require native end-to-end testing and signed release builds. Windows session termination uses process termination and has not been verified to clean up every native TUN/DNS setting; do not treat those targets as production validated.
+- **Linux x64 is built and tested locally.** Windows/macOS library builds, desktop paths and asset downloads are implemented but still require native end-to-end testing and signed release builds. Abrupt process termination has not been verified to clean up every native TUN/DNS setting on every platform; do not treat those targets as production validated. In particular, forced termination cannot run the core's DNS-restoration code.
 - There is no auto-start, automatic reconnection, or automatic update service. Public Windows/macOS distribution additionally needs signing/notarization and platform validation.
 
 ## Development
 
-Requirements: a recent stable Rust toolchain, Node.js **22.12+** (developed with Node 26), and the target platform’s desktop build tools. Linux needs Electron’s GTK/NSS/audio dependencies and polkit with an authentication agent for elevated configurations. Core setup uses `unzip`/`tar` on Unix and PowerShell on Windows.
+Requirements: **Go 1.27+**, a C compiler for cgo, a recent stable Rust toolchain, Node.js **22.12+** (developed with Node 26), and the target platform’s desktop build tools. Windows additionally needs a cgo-compatible compiler such as MinGW-w64. Linux needs Electron’s GTK/NSS/audio dependencies and polkit with an authentication agent for elevated configurations. Asset setup uses `unzip` on Unix and PowerShell on Windows.
 
 ```sh
 npm ci
-npm run prepare:cores   # Download pinned, SHA-256-verified Xray release
-npm run build:service
+npm run prepare:cores   # Download SHA-256-verified assets/licenses, not an executable
+npm run build:service   # Build the embedded Go library and Rust service
 npm run dev
 ```
 
-Restart the development app after changing main/preload code. Download URLs, versions and SHA-256 hashes are recorded in [`scripts/cores.json`](scripts/cores.json).
+Restart the development app after changing main/preload code. Download URLs, source commit, versions and release SHA-256 hashes are recorded in [`scripts/cores.json`](scripts/cores.json). The source dependency and its checksums are locked in `native/xray/go.mod` and `native/xray/go.sum`. `npm run build:core` rebuilds just the shared library and its bundled dependency-license notices.
 
 ### Test
 
@@ -87,7 +89,7 @@ npm run test:ui
 npm audit
 ```
 
-Linux integration tests require `iproute2`, Python 3, `unshare`, `mount`, `/dev/net/tun`, and enabled unprivileged user namespaces. They isolate the **user, mount and network namespaces**, hide host D-Bus sockets, and use a local upstream fixture. Tests exercise real **native Xray TUN IPv4/IPv6 TCP, UDP and explicit DNS traffic**, clean disconnect, startup cancellation, process crashes and the connection manager. They do not change your host’s routes/DNS or require a real proxy server/admin prompt. System resolver takeover itself is not exercised.
+Linux integration tests require `iproute2`, Python 3, `unshare`, `mount`, `/dev/net/tun`, and enabled unprivileged user namespaces. They isolate the **user, mount and network namespaces**, hide host D-Bus sockets, and use a local upstream fixture. Tests exercise real **native Xray TUN IPv4/IPv6 TCP, UDP and explicit DNS traffic**, clean disconnect, startup cancellation, partial startup failure, heartbeat timeout, process crashes and the connection manager. They also verify that Xray's library is mapped into the session process and that no core child process is running. They do not change your host’s routes/DNS or require a real proxy server/admin prompt. System resolver takeover itself is not exercised.
 
 Desktop tests exercise real renderer/preload/IPC and configuration validation, the minimal layout and sandbox settings, and a **real non-elevated SOCKS connection**. A separate state-rendering test simulates activation; native TUN is tested only inside the isolated network namespace.
 
@@ -105,6 +107,7 @@ Test a packaged/installed executable:
 
 ```sh
 XRAYC_TEST_BINARY="$HOME/.local/opt/xrayc/xrayc" npm run test:ui
+XRAYC_TEST_BIN_DIR="$HOME/.local/opt/xrayc/resources/bin" npm run test:cores
 ```
 
 To uninstall, remove those paths and `~/.local/share/icons/hicolor/256x256/apps/xrayc.png`. Remove the per-user Xrayc application-data directory separately to delete remembered settings.
@@ -115,8 +118,10 @@ To uninstall, remove those paths and `~/.local/share/icons/hicolor/256x256/apps/
 - `src/main/` — Electron integration, encrypted preferences and connection transport.
 - `native/src/config.rs` — validation and permission detection; networking settings are preserved.
 - `native/src/controller.rs` — authorization and connection lifecycle.
-- `native/src/main.rs` — session-owned Xray process and cleanup.
-- `scripts/` — builds, downloads, packaging and installation.
+- `native/src/main.rs` — session-owned embedded core and cleanup.
+- `native/src/core.rs` — versioned C ABI, library ownership and error handling.
+- `native/xray/` — pinned Go dependency, Xray library wrapper and lifecycle tests.
+- `scripts/` — library/service builds, asset downloads, packaging and installation.
 - `tests/` — desktop and isolated native TUN tests.
 
 Xrayc is MIT licensed. Bundled Xray-core is MPL-2.0; platform driver and dependency licenses remain applicable. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

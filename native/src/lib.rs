@@ -1,5 +1,6 @@
 pub mod config;
 pub mod controller;
+pub mod core;
 
 use serde::{Deserialize, Serialize};
 

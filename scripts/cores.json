@@ -2,6 +2,8 @@
   "xray": {
     "repository": "XTLS/Xray-core",
     "version": "v26.11.9",
+    "moduleVersion": "v1.260327.1-0.20261109052709-676eaf66f8f0",
+    "commit": "676eaf66f8f05d4d558ee7a74b4736623d3feeb9",
     "assets": {
       "linux-x64": ["Xray-linux-64.zip", "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82"],
       "linux-arm64": ["Xray-linux-arm64-v8a.zip", "64ed6858982a7f5eb85d88b811089063bd4f17561f4c8f44e0f1dc8e6f6430be"],

@@ -1,7 +1,8 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, chmod } from 'node:fs/promises';
 import path from 'node:path';
 
+execFileSync(process.execPath, ['scripts/build-core.mjs'], { stdio: 'inherit' });
 const result = spawnSync('cargo', ['build', '--release', '--locked', '--manifest-path', 'native/Cargo.toml'], { stdio: 'inherit' });
 if (result.status !== 0) process.exit(result.status ?? 1);
 const name = `xrayc-service${process.platform === 'win32' ? '.exe' : ''}`;
