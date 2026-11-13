@@ -111,7 +111,16 @@ test('connects and disconnects with accessible status and locked configuration',
   await expect(page.locator('#status-label')).toHaveText('Connected');
   await expect(page.locator('#configuration')).toBeDisabled();
   await expect(page.locator('#duration')).toHaveText(/\d{2}:\d{2}:\d{2}/);
-  await page.getByRole('button', { name: 'Disconnect Xray', exact: true }).click();
+  const disconnect = page.getByRole('button', { name: 'Disconnect Xray', exact: true });
+  const label = disconnect.locator('#connect-label');
+  await page.getByRole('heading', { name: 'Xrayc' }).hover();
+  await expect(label).toHaveCSS('color', 'rgb(224, 231, 236)');
+  await disconnect.hover();
+  await expect(disconnect).toHaveCSS('background-color', 'rgb(191, 239, 209)');
+  await expect(label).toHaveCSS('color', 'rgb(21, 51, 35)');
+  await page.getByRole('heading', { name: 'Xrayc' }).hover();
+  await expect(label).toHaveCSS('color', 'rgb(224, 231, 236)');
+  await disconnect.click();
   await expect(page.locator('#status-label')).toHaveText('Disconnected');
   await expect(page.locator('#configuration')).toBeEnabled();
 });

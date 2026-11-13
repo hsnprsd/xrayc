@@ -52,7 +52,7 @@ textarea::placeholder { color: #788496; }
 .remember-label input { margin: 0; accent-color: var(--accent); }
 .remember-label:has(input:disabled) { opacity: .5; }
 .connect-button { border: 0; border-radius: 8px; background: var(--accent); color: #153323; font-weight: 600; font-size: 14px; padding: 13px; }
-.connect-button:hover:not(:disabled) { background: #bfefd1; }
+.connect-button:hover:not(:disabled) { background: #bfefd1; color: #153323; }
 .connect-button:disabled { background: #293a32; color: #87968e; }
 .connect-button.connected { background: #29353b; color: #e0e7ec; }
 .status { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 16px; }
